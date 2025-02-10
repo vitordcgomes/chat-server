@@ -1,3 +1,5 @@
+const SERVER_URL = "http://192.168.15.13:5501"
+
 const username = prompt("Digite seu nome de usuário:")
 const room = prompt("Digite o nome da sala:")
 let lastMessageTimestamp = 0
@@ -5,7 +7,7 @@ const clientId = Date.now().toString()
 
 // Função para entrar na sala
 function joinRoom() {
-  fetch("http://localhost:5000/join", {
+  fetch(`${SERVER_URL}/join`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -30,7 +32,7 @@ function sendMessage() {
   const message = messageInput.value.trim()
 
   if (message) {
-    fetch("http://localhost:5000/send", {
+    fetch(`${SERVER_URL}/send`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -69,7 +71,7 @@ function addMessageToChat(sender, message, isSent, timestamp) {
 }
 
 function receiveMessages() {
-  fetch(`http://localhost:5000/receive?room=${room}&client_id=${clientId}&last_timestamp=${lastMessageTimestamp}`)
+  fetch(`${SERVER_URL}/receive?room=${room}&client_id=${clientId}&last_timestamp=${lastMessageTimestamp}`)
     .then((response) => response.json())
     .then((data) => {
       if (data.messages && data.messages.length > 0) {
@@ -91,7 +93,7 @@ function receiveMessages() {
 }
 
 function leaveRoom() {
-  fetch("http://localhost:5000/leave", {
+  fetch(`${SERVER_URL}/leave`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

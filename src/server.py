@@ -2,12 +2,28 @@ import threading
 import socket
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from queue import Queue
+from flask import send_from_directory
 import json
 import time
+import os 
+
 
 app = Flask(__name__)
 CORS(app)
+
+# Obtém o diretório atual do script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Servindo a página principal
+@app.route('/')
+def serve_index():
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'index.html')
+
+# Servindo arquivos estáticos corretamente
+@app.route('/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
+
 
 # Dicionário de salas, onde cada sala é uma lista de clientes
 rooms = {}
@@ -118,7 +134,7 @@ def main():
     print("Iniciou o servidor de bate-papo")
 
     try:
-        server.bind(("localhost", 7777))
+        server.bind(("192.168.15.13", 5500))
         server.listen()
     except:
         return print('\nNão foi possível iniciar o servidor!\n')
@@ -145,7 +161,7 @@ def main():
     threading.Thread(target=accept_clients).start()
 
     # Inicia o servidor Flask
-    app.run(port=5000)
+    app.run(host="0.0.0.0", port=5501, debug=True, use_reloader=False)
 
 # Executa o programa
 if __name__ == '__main__':
