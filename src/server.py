@@ -1,18 +1,28 @@
 import threading
 import socket
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from flask import send_from_directory
 import json
 import time
-import os 
-
+import os
 
 app = Flask(__name__)
 CORS(app)
 
 # Obtém o diretório atual do script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Dicionário de salas, onde cada sala é uma lista de clientes
+rooms = {}
+
+# Dicionário de mensagens para cada sala
+room_messages = {}
+
+# Dicionário de usuários em cada sala
+room_users = {}
+
+# Dicionário de timestamps da última mensagem para cada cliente
+last_message_timestamps = {}
 
 # Servindo a página principal
 @app.route('/')
@@ -23,16 +33,6 @@ def serve_index():
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
-
-
-# Dicionário de salas, onde cada sala é uma lista de clientes
-rooms = {}
-
-# Dicionário de mensagens para cada sala
-room_messages = {}
-
-# Dicionário de timestamps da última mensagem para cada cliente
-last_message_timestamps = {}
 
 # Função para lidar com as mensagens de um cliente
 def handle_client(client, room):
@@ -69,6 +69,24 @@ def remove_client(client, room):
     if room in rooms and client in rooms[room]:
         rooms[room].remove(client)
         client.close()
+        # Remove o usuário da lista de usuários da sala
+        if room in room_users:
+            username_to_remove = None
+            for username, client_socket in room_users[room].items():
+                if client_socket == client:
+                    username_to_remove = username
+                    break
+            if username_to_remove:
+                del room_users[room][username_to_remove]
+
+# Nova rota para listar usuários de uma sala
+@app.route('/list_users', methods=['GET'])
+def list_users():
+    room = request.args.get('room')
+    if room in room_users:
+        users = list(room_users[room].keys())
+        return jsonify({"status": "success", "users": users})
+    return jsonify({"status": "error", "message": "Room not found"})
 
 # Rota para entrar em uma sala
 @app.route('/join', methods=['POST'])
@@ -76,9 +94,17 @@ def join_room():
     data = request.json
     room = data['room']
     username = data['username']
+    
     if room not in rooms:
         rooms[room] = []
         room_messages[room] = []
+        room_users[room] = {}
+    
+    # Adiciona o usuário à lista de usuários da sala
+    if room not in room_users:
+        room_users[room] = {}
+    room_users[room][username] = None  # Será atualizado quando o socket for criado
+    
     broadcast({'type': 'system', 'message': f"{username} entrou na sala"}, None, room)
     return jsonify({"status": "success", "message": f"Joined room {room}"})
 
@@ -89,10 +115,13 @@ def leave_room():
     room = data['room']
     username = data['username']
     if room in rooms:
+        if room in room_users and username in room_users[room]:
+            del room_users[room][username]
         broadcast({'type': 'system', 'message': f"{username} saiu da sala"}, None, room)
         return jsonify({"status": "success", "message": f"Left room {room}"})
     return jsonify({"status": "error", "message": "Room not found"})
 
+# Restante do código do servidor permanece o mesmo...
 # Rota para enviar mensagens
 @app.route('/send', methods=['POST'])
 def send_message():
