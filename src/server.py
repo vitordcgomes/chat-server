@@ -96,4 +96,4 @@ def broadcast(data, room):
         room_messages[room] = room_messages[room][-50:]  # Mantém um histórico limitado para evitar sobrecarga
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5501, debug=True, use_reloader=False)
+    app.run(host="localhost", port=5501, debug=True, use_reloader=False)

@@ -1,4 +1,4 @@
-const SERVER_URL = "http://192.168.15.8:5501";
+const SERVER_URL = "http://localhost:5501";
 
 const username = prompt("Digite seu nome de usuário:");
 let currentRoom = null;
