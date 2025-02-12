@@ -36,21 +36,25 @@ function switchRoom(room) {
   }
 }
 
-function addMessageToChat(sender, message, isSent) {
+function addMessageToChat(sender, message, isSent, timestamp) {
   const chatMessages = document.getElementById("chat-messages");
   const messageElement = document.createElement("div");
-  messageElement.classList.add("message");
 
-  if (sender === "system") {
+  if (sender === "system" || sender === null || sender === undefined) {
     messageElement.classList.add("system-message");
-    messageElement.textContent = message;
+    messageElement.textContent = message; // Exibe a mensagem centralizada sem prefixo
   } else {
+    messageElement.classList.add("message");
     messageElement.classList.add(isSent ? "message-sent" : "message-received");
     messageElement.textContent = isSent ? message : `${sender}: ${message}`;
   }
 
   chatMessages.appendChild(messageElement);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  if (timestamp > (lastMessageTimestamps[currentRoom] || 0)) {
+    lastMessageTimestamps[currentRoom] = timestamp;
+  }
 }
 
 function receiveMessages() {
