@@ -1,198 +1,99 @@
-import threading
-import socket
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-import json
 import time
 import os
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-# Obtém o diretório atual do script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Dicionário de salas, onde cada sala é uma lista de clientes
+# Estrutura para armazenar salas, mensagens e usuários ativos
 rooms = {}
-
-# Dicionário de mensagens para cada sala
 room_messages = {}
 
-# Dicionário de usuários em cada sala
-room_users = {}
-
-# Dicionário de timestamps da última mensagem para cada cliente
-last_message_timestamps = {}
-
-# Servindo a página principal
 @app.route('/')
 def serve_index():
     return send_from_directory(os.path.join(BASE_DIR, 'static'), 'index.html')
 
-# Servindo arquivos estáticos corretamente
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
 
-# Função para lidar com as mensagens de um cliente
-def handle_client(client, room):
-    while True:
-        try:
-            msg = client.recv(2048).decode('utf-8')
-            data = json.loads(msg)
-            if data['type'] == 'message':
-                broadcast(data, client, room)
-            elif data['type'] == 'join':
-                broadcast({'type': 'system', 'message': f"{data['username']} entrou na sala"}, client, room)
-            elif data['type'] == 'leave':
-                broadcast({'type': 'system', 'message': f"{data['username']} saiu da sala"}, client, room)
-                remove_client(client, room)
-                break
-        except:
-            remove_client(client, room)
-            break
-
-# Função para transmitir mensagens para todos os clientes em uma sala
-def broadcast(data, sender, room):
-    if room in rooms:
-        timestamp = time.time()
-        data['timestamp'] = timestamp
-        room_messages[room].append(data)
-        for client in rooms[room]:
-            try:
-                client.send(json.dumps(data).encode('utf-8'))
-            except:
-                remove_client(client, room)
-
-# Função para remover um cliente de uma sala
-def remove_client(client, room):
-    if room in rooms and client in rooms[room]:
-        rooms[room].remove(client)
-        client.close()
-        # Remove o usuário da lista de usuários da sala
-        if room in room_users:
-            username_to_remove = None
-            for username, client_socket in room_users[room].items():
-                if client_socket == client:
-                    username_to_remove = username
-                    break
-            if username_to_remove:
-                del room_users[room][username_to_remove]
-
-# Nova rota para listar usuários de uma sala
-@app.route('/list_users', methods=['GET'])
-def list_users():
-    room = request.args.get('room')
-    if room in room_users:
-        users = list(room_users[room].keys())
-        return jsonify({"status": "success", "users": users})
-    return jsonify({"status": "error", "message": "Room not found"})
-
-# Rota para entrar em uma sala
 @app.route('/join', methods=['POST'])
 def join_room():
     data = request.json
     room = data['room']
     username = data['username']
-    
-    if room not in rooms:
-        rooms[room] = []
-        room_messages[room] = []
-        room_users[room] = {}
-    
-    # Adiciona o usuário à lista de usuários da sala
-    if room not in room_users:
-        room_users[room] = {}
-    room_users[room][username] = None  # Será atualizado quando o socket for criado
-    
-    broadcast({'type': 'system', 'message': f"{username} entrou na sala"}, None, room)
-    return jsonify({"status": "success", "message": f"Joined room {room}"})
 
-# Rota para sair de uma sala
+    if room not in rooms:
+        rooms[room] = set()
+        room_messages[room] = []
+
+    rooms[room].add(username)
+    broadcast({'type': 'system', 'message': f"{username} entrou na sala"}, room)
+
+    return jsonify({"status": "success", "message": f"Entrou na sala {room}"})
+
 @app.route('/leave', methods=['POST'])
 def leave_room():
     data = request.json
     room = data['room']
     username = data['username']
-    if room in rooms:
-        if room in room_users and username in room_users[room]:
-            del room_users[room][username]
-        broadcast({'type': 'system', 'message': f"{username} saiu da sala"}, None, room)
-        return jsonify({"status": "success", "message": f"Left room {room}"})
-    return jsonify({"status": "error", "message": "Room not found"})
 
-# Restante do código do servidor permanece o mesmo...
-# Rota para enviar mensagens
+    if room in rooms and username in rooms[room]:
+        rooms[room].remove(username)
+        broadcast({'type': 'system', 'message': f"{username} saiu da sala"}, room)
+        if not rooms[room]:  # Se não houver usuários, limpa a sala
+            del rooms[room]
+            del room_messages[room]
+
+        return jsonify({"status": "success", "message": f"Saiu da sala {room}"})
+
+    return jsonify({"status": "error", "message": "Usuário ou sala não encontrados"})
+
 @app.route('/send', methods=['POST'])
 def send_message():
     data = request.json
     username = data['username']
     message = data['message']
     room = data['room']
-    if room in rooms:
-        broadcast({'type': 'message', 'username': username, 'message': message}, None, room)
-        return jsonify({"status": "success"})
-    return jsonify({"status": "error", "message": "Room not found"})
 
-# Rota para receber mensagens (long-polling)
+    if room in rooms:
+        msg_data = {
+            'type': 'message',
+            'username': username,
+            'message': message,
+            'timestamp': time.time()
+        }
+        broadcast(msg_data, room)
+        return jsonify({"status": "success"})
+    
+    return jsonify({"status": "error", "message": "Sala não encontrada"})
+
 @app.route('/receive', methods=['GET'])
 def receive_messages():
     room = request.args.get('room')
-    client_id = request.args.get('client_id')
     last_timestamp = float(request.args.get('last_timestamp', 0))
-    
+
     if room in room_messages:
         new_messages = [msg for msg in room_messages[room] if msg['timestamp'] > last_timestamp]
-        if new_messages:
-            return jsonify({"messages": new_messages})
-        else:
-            # Espera por novas mensagens por até 20 segundos
-            start_time = time.time()
-            while time.time() - start_time < 20:
-                new_messages = [msg for msg in room_messages[room] if msg['timestamp'] > last_timestamp]
-                if new_messages:
-                    return jsonify({"messages": new_messages})
-                time.sleep(0.5)
-    
+        return jsonify({"messages": new_messages})
+
     return jsonify({"messages": []})
 
-# Função principal
-def main():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+@app.route('/user_rooms', methods=['GET'])
+def get_user_rooms():
+    username = request.args.get('username')
+    user_rooms = [room for room, users in rooms.items() if username in users]
+    return jsonify({"rooms": user_rooms})
 
-    print("Iniciou o servidor de bate-papo")
+def broadcast(data, room):
+    """Adiciona mensagem ao histórico da sala e envia para os usuários."""
+    if room in room_messages:
+        data['timestamp'] = time.time()
+        room_messages[room].append(data)
+        room_messages[room] = room_messages[room][-50:]  # Mantém um histórico limitado para evitar sobrecarga
 
-    try:
-        server.bind(("192.168.15.13", 5500))
-        server.listen()
-    except:
-        return print('\nNão foi possível iniciar o servidor!\n')
-
-    def accept_clients():
-        while True:
-            client, addr = server.accept()
-            print(f'Cliente conectado com sucesso. IP: {addr}')
-
-            # Aguarda o cliente enviar o nome da sala
-            data = json.loads(client.recv(1024).decode('utf-8'))
-            room = data['room']
-            username = data['username']
-            if room not in rooms:
-                rooms[room] = []
-                room_messages[room] = []
-            rooms[room].append(client)
-
-            # Inicia uma nova thread para lidar com as mensagens do cliente
-            thread = threading.Thread(target=handle_client, args=(client, room))
-            thread.start()
-
-    # Inicia uma thread para aceitar clientes
-    threading.Thread(target=accept_clients).start()
-
-    # Inicia o servidor Flask
-    app.run(host="0.0.0.0", port=5501, debug=True, use_reloader=False)
-
-# Executa o programa
 if __name__ == '__main__':
-    main()
-
+    app.run(host="0.0.0.0", port=5501, debug=True, use_reloader=False)
