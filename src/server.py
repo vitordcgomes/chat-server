@@ -14,14 +14,24 @@ room_messages = {}
 
 @app.route('/')
 def serve_index():
+    """Servir a página inicial (index.html)."""
     return send_from_directory(os.path.join(BASE_DIR, 'static'), 'index.html')
 
 @app.route('/<path:filename>')
 def serve_static(filename):
+    """Servir arquivos estáticos da pasta 'static'."""
     return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
 
 @app.route('/join', methods=['POST'])
 def join_room():
+    """Adicionar um usuário a uma sala de chat.
+    
+    Requisição:
+        - JSON: {"room": "nome_da_sala", "username": "nome_do_usuario"}
+
+    Retorno:
+        - JSON com status de sucesso ou erro.
+    """
     data = request.json
     room = data['room']
     username = data['username']
@@ -37,6 +47,14 @@ def join_room():
 
 @app.route('/leave', methods=['POST'])
 def leave_room():
+    """Remover um usuário de uma sala de chat.
+    
+    Requisição:
+        - JSON: {"room": "nome_da_sala", "username": "nome_do_usuario"}
+
+    Retorno:
+        - JSON com status de sucesso ou erro.
+    """
     data = request.json
     room = data['room']
     username = data['username']
@@ -54,6 +72,14 @@ def leave_room():
 
 @app.route('/send', methods=['POST'])
 def send_message():
+    """Enviar uma mensagem para uma sala específica.
+    
+    Requisição:
+        - JSON: {"username": "nome_do_usuario", "message": "texto_da_mensagem", "room": "nome_da_sala"}
+
+    Retorno:
+        - JSON com status de sucesso ou erro.
+    """
     data = request.json
     username = data['username']
     message = data['message']
@@ -73,6 +99,15 @@ def send_message():
 
 @app.route('/receive', methods=['GET'])
 def receive_messages():
+    """Obter mensagens recentes de uma sala.
+    
+    Parâmetros:
+        - room: Nome da sala (string)
+        - last_timestamp: Último timestamp recebido (float, opcional)
+
+    Retorno:
+        - JSON: {"messages": [{"type": "message", "username": "user", "message": "texto", "timestamp": float}, ...]}
+    """
     room = request.args.get('room')
     last_timestamp = float(request.args.get('last_timestamp', 0))
 
@@ -84,12 +119,25 @@ def receive_messages():
 
 @app.route('/user_rooms', methods=['GET'])
 def get_user_rooms():
+    """Retorna uma lista de salas em que um usuário está presente.
+    
+    Parâmetros:
+        - username: Nome do usuário (string)
+
+    Retorno:
+        - JSON: {"rooms": ["sala1", "sala2", ...]}
+    """
     username = request.args.get('username')
     user_rooms = [room for room, users in rooms.items() if username in users]
     return jsonify({"rooms": user_rooms})
 
 def broadcast(data, room):
-    """Adiciona mensagem ao histórico da sala e envia para os usuários."""
+    """Adiciona uma mensagem ao histórico da sala e limita a 50 mensagens.
+    
+    Parâmetros:
+        - data: Dicionário contendo a mensagem.
+        - room: Nome da sala.
+    """
     if room in room_messages:
         data['timestamp'] = time.time()
         room_messages[room].append(data)

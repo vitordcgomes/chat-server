@@ -6,6 +6,9 @@ let rooms = [];
 const lastMessageTimestamps = {};
 const clientId = Date.now().toString();
 
+/**
+ * Atualiza a lista de salas do usuário.
+ */
 function updateRoomList() {
   fetch(`${SERVER_URL}/user_rooms?username=${username}`)
     .then((response) => response.json())
@@ -25,6 +28,11 @@ function updateRoomList() {
     });
 }
 
+
+/**
+ * Alterna para uma sala específica e carrega as mensagens.
+ * @param {string} room - Nome da sala para alternar.
+ */
 function switchRoom(room) {
   if (currentRoom !== room) {
     currentRoom = room;
@@ -36,6 +44,14 @@ function switchRoom(room) {
   }
 }
 
+
+/**
+ * Adiciona uma mensagem ao chat.
+ * @param {string} sender - Nome do remetente da mensagem.
+ * @param {string} message - Conteúdo da mensagem.
+ * @param {boolean} isSent - Define se a mensagem foi enviada pelo próprio usuário.
+ * @param {number} timestamp - Timestamp da mensagem.
+ */
 function addMessageToChat(sender, message, isSent, timestamp) {
   const chatMessages = document.getElementById("chat-messages");
   const messageElement = document.createElement("div");
@@ -57,6 +73,9 @@ function addMessageToChat(sender, message, isSent, timestamp) {
   }
 }
 
+/**
+ * Obtém novas mensagens do servidor.
+ */
 function receiveMessages() {
   if (!currentRoom) return;
 
@@ -79,6 +98,9 @@ function receiveMessages() {
     });
 }
 
+/**
+ * Envia uma mensagem para o servidor.
+ */
 function sendMessage() {
   const messageInput = document.getElementById("message-input");
   const message = messageInput.value.trim();
