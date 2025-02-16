@@ -30,10 +30,9 @@ pip install -r requirements.txt
 ```
 
 ### 2. Executar o Servidor
-Para iniciar o servidor, utilize o comando no diretório /src:
+Para iniciar o servidor, utilize o comando:
 ```sh
-cd src
-python3 server.py
+python3 src/server.py
 ```
 O servidor estará rodando em `http://localhost:5501`.
 
