@@ -9,14 +9,16 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Estrutura para armazenar salas, mensagens e usuários ativos
-rooms = {}
-room_messages = {}
+rooms = {} # Um dicionário onde as chaves são os nomes das salas e os valores são conjuntos de usuários ativos naquela sala.
+room_messages = {} # Um dicionário que armazena as mensagens trocadas em cada sala, associando-as por nome.
 
+# Sempre que um usuário acessar a raiz do servidor (http://localhost:5501/), o arquivo index.html será enviado ao navegador.
 @app.route('/')
 def serve_index():
     """Servir a página inicial (index.html)."""
     return send_from_directory(os.path.join(BASE_DIR, 'static'), 'index.html')
 
+# Isso permite carregar arquivos como CSS, imagens e scripts JavaScript necessários para o funcionamento da interface.
 @app.route('/<path:filename>')
 def serve_static(filename):
     """Servir arquivos estáticos da pasta 'static'."""
